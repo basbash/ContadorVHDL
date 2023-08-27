@@ -1,0 +1,135 @@
+library IEEE;
+use ieee.std_logic_1164.all;
+use ieee.std_logic_unsigned.all;
+use ieee.numeric_std.all;
+
+-- incluir APENAS DOIS SEFMENTOS
+-- contador de dois dígitos
+entity projeto is
+    port (
+        clk : in std_logic;
+        rst : in std_logic;  -- BOTÃO DE RESET ASSÍNCRONO
+		  dsp : out unsigned(6 downto 0) := (others => '0'); -- pinagem do display 7-seg
+        nds : out unsigned(1 downto 0) := (others => '0')  -- identificador do display
+    );
+end projeto;
+
+architecture arch_contador of projeto is
+    
+    constant FREQ : natural := 25000000; -- frequencia do clock do dispositivo em Hz
+    signal clk_out : std_logic := '0'; -- clock de saída do abaixador de frequencia.
+        
+    signal uni : unsigned (3 downto 0) := (others => '0');
+    signal dez : unsigned (3 downto 0) := (others => '0');
+
+    signal sel : unsigned (1 downto 0) := (others => '0');
+
+    signal display_id   : unsigned (1 downto 0) := (others => '0');
+    signal display_foco : unsigned (1 downto 0) := (others => '0');
+
+    component display_sete_segmentos is
+        port (
+            input_value : in UNSIGNED (3 downto 0);
+            segment_output : out UNSIGNED(6 downto 0)
+        );
+    end component;
+
+    signal SEG : unsigned (6 downto 0);
+    signal SEG1 : unsigned (6 downto 0);
+    signal SEG2 : unsigned (6 downto 0);
+    
+    
+begin
+
+    -- divisor de frequencia clockout
+    clock: process (clk)
+    
+    variable clk_counter : natural range 0 to FREQ;
+    
+    begin
+        if rising_edge(clk) then
+            clk_counter := clk_counter + 1;
+            if clk_counter = FREQ then
+
+                clk_counter := 0;
+                clk_out <= not clk_out;
+            end if;
+        end if;
+    end process; -- divisor de frequencia clockout
+       
+		 
+		 
+		     -- divisor de frequencia clockout
+    clock_1: process (clk)
+    
+    variable clk_counter : natural range 0 to 100;
+    begin
+        if rising_edge(clk) then
+            clk_counter := clk_counter + 1;
+            if clk_counter = 100 then
+				display_id <= display_id + 1;
+				clk_counter := 0;
+            end if;
+        end if;
+    end process; -- divisor de frequencia clockout		 
+	 
+	 
+    -- contador de dois dígitos
+    contador: process (clk_out) 
+    begin
+        if rising_edge(clk_out) then
+            uni <= uni + 1;
+            if uni = 9 then
+                uni <= (others => '0');
+                -- contador de dezenas acionado quando a unidade zera.
+                dez <= dez + 1;
+                if dez = 9 then
+                    dez <= (others => '0');
+                end if;
+            end if;
+        end if;
+    end process; -- contador de dois dígitos
+    
+    --
+    decoder_S1 : display_sete_segmentos
+        port map (
+            input_value => uni,
+            segment_output => SEG1
+        );
+    
+    --
+    decoder_S2 : display_sete_segmentos
+        port map (
+            input_value => dez,
+            segment_output => SEG2
+        );
+	 
+	 
+    plex_display : process (clk) 
+    begin   
+	 if falling_edge(clk) then
+        -- seleciona o display de modo síncrono ao clock
+        -- seleciona apenas dois displays possíveis já que é um contador de dois dígitos.
+        case display_id is
+            when "0" => display_foco   <= "1110";
+            when "1" => display_foco   <= "1101";
+         -- when "0" => display_foco   <= "xxxx";
+         -- when "1" => display_foco   <= "xxxx";
+            when others => display_foco <= "1111";
+        end case;
+		  
+		  case display_id is
+				when "0" => SEG <= SEG1;
+				when "1" => SEG <= SEG2;
+				when "0" => SEG <= SEG1;
+				when "1" => SEG <= SEG2;
+				end case;
+		end if;
+    end process;
+
+    nds <= display_foco;
+    dsp <= SEG;
+
+end architecture arch_contador;
+
+
